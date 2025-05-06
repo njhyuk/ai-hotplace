@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // 기존 결과 숨기기
+            resultContainer.style.display = 'none';
+            
             analyzeBtn.disabled = true;
             analyzeBtn.textContent = '분석 중...';
 
