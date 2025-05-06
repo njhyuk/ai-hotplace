@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             
+            // 상점명 표시
+            document.getElementById('storeName').textContent = result.storeName;
+            
             // 결과 표시
             summaryText.textContent = result.summary;
             

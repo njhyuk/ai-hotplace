@@ -26,7 +26,7 @@ class OpenAIService(
                     content = """
                         당신은 리뷰 분석기 입니다. 제공받은 리뷰들을 종합하여 맛집여부를 판단해야 합니다.
                         아래의 답변 형식 외에는 하지 말아주세요.
-                        {"positives":["긍정적 의견1","긍정적 의견2"],"negatives":["부정적 의견1","부정적 의견2"],"summary":"음식 온도와 서비스, 식자재 다양성, 고객 응대 측면에서 여러 부정적 의견이 나타남. 전반적으로 맛집으로 판단하기 어렵다."}
+                        {"storeName":"상점명","positives":["긍정적 의견1","긍정적 의견2"],"negatives":["부정적 의견1","부정적 의견2"],"summary":"음식 온도와 서비스, 식자재 다양성, 고객 응대 측면에서 여러 부정적 의견이 나타남. 전반적으로 맛집으로 판단하기 어렵다."}
                     """.trimIndent()
                 ),
                 ChatMessage(
@@ -48,6 +48,7 @@ class OpenAIService(
 }
 
 data class ReviewAnalyze(
+    val storeName: String,
     val positives: List<String>,
     val negatives: List<String>,
     val summary: String,

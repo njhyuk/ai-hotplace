@@ -62,6 +62,11 @@ class WebScraperService {
                url.matches(Regex(REDIRECTED_REVIEW_URL_PATTERN))
     }
 
+    private fun extractPlaceName(): String {
+        val metaTitle = driver.findElement(By.cssSelector("meta[property='og:title']")).getAttribute("content")
+        return metaTitle.split(" : ").first()
+    }
+
     fun scrapeWebPage(url: String): String {
         return try {
             logger.info("Starting to load URL: $url")
@@ -98,6 +103,10 @@ class WebScraperService {
                 throw RuntimeException("Failed to navigate to the review page")
             }
             
+            // Extract place name from og:title
+            val placeName = extractPlaceName()
+            logger.info("Extracted place name: $placeName")
+            
             waitForReactElements()
             clickMoreButtonMultipleTimes()
             
@@ -107,7 +116,8 @@ class WebScraperService {
                 return "No matching elements found"
             }
 
-            extractAndFormatTexts(elements)
+            val reviews = extractAndFormatTexts(elements)
+            "storeName:$placeName\n$reviews"
         } catch (e: Exception) {
             logger.error("Error occurred while scraping webpage: ${e.message}", e)
             throw RuntimeException("Failed to scrape webpage: ${e.message}", e)

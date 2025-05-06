@@ -17,6 +17,7 @@ class ReviewAnalysisController(
         val response = openAIService.analyzeContent(scrapedContent)
 
         return AnalyzeReviewResponse(
+            storeName = response.storeName,
             positives = response.positives,
             negatives = response.negatives,
             summary = response.summary,
@@ -29,6 +30,7 @@ data class AnalyzeReviewRequest(
 )
 
 data class AnalyzeReviewResponse(
+    val storeName: String,
     val positives: List<String>,
     val negatives: List<String>,
     val summary: String,
