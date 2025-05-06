@@ -1,3 +1,7 @@
+# AI 맛집 판단기
+
+![img.png](demo_img.png)
+
 ## 실행방법
 
 ```sh
