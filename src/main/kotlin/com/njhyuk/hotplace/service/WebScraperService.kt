@@ -26,7 +26,7 @@ class WebScraperService {
         private const val TARGET_ELEMENT_SELECTOR = "[data-pui-click-code=rvshowmore]"
         private const val USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         private const val MORE_BUTTON_SELECTOR = ".NSTUp"
-        private const val MAX_CLICKS = 5
+        private const val MAX_CLICKS = 20
         private const val REVIEW_URL_PATTERN = "https://pcmap.place.naver.com/restaurant/\\d+/review/visitor"
         private const val MAP_URL_PATTERN = "https://map.naver.com/p/entry/place/\\d+"
         private const val REDIRECTED_REVIEW_URL_PATTERN = "https://map.naver.com/p/entry/place/\\d+\\?placePath=.*"
