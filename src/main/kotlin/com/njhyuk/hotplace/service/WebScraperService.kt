@@ -135,7 +135,18 @@ class WebScraperService {
 
     private fun waitForReactElements() {
         logger.info("Waiting for React elements to render...")
-        wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TARGET_ELEMENT_SELECTOR)))
+        try {
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TARGET_ELEMENT_SELECTOR)))
+        } catch (e: Exception) {
+            logger.info("No more button found or all reviews are already loaded")
+            // Check if there are any reviews at all
+            val elements = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))
+            if (elements.isEmpty()) {
+                logger.warn("No reviews found on the page")
+            } else {
+                logger.info("Found ${elements.size} reviews without more button")
+            }
+        }
     }
 
     private fun findTargetElements(): List<WebElement> {
@@ -173,9 +184,19 @@ class WebScraperService {
         var previousElementCount = 0
         var consecutiveNoNewElements = 0
         
+        // First check if there are any reviews at all
+        val initialElements = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))
+        if (initialElements.isEmpty()) {
+            logger.info("No reviews found on the page")
+            return
+        }
+        
         while (clickCount < MAX_CLICKS) {
             try {
-                val moreButton = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(MORE_BUTTON_SELECTOR)))
+                // Try to find the more button with a shorter timeout
+                val moreButton = WebDriverWait(driver, Duration.ofSeconds(5))
+                    .until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(MORE_BUTTON_SELECTOR)))
+                
                 if (!moreButton.isDisplayed || !moreButton.isEnabled) {
                     logger.info("More button is no longer visible or enabled after $clickCount clicks")
                     break
@@ -206,20 +227,13 @@ class WebScraperService {
                     }
                 }
             } catch (e: Exception) {
-                logger.info("No more '더보기' button found or error occurred after $clickCount clicks: ${e.message}")
+                logger.info("No more '더보기' button found or all reviews are already loaded after $clickCount clicks")
                 break
             }
         }
         
         val finalElementCount = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)).size
-        logger.info("Finished clicking '더보기' button. Total clicks: $clickCount, Total elements found: $finalElementCount")
-        
-        if (clickCount < MAX_CLICKS) {
-            logger.info("Could not reach maximum clicks ($MAX_CLICKS). Possible reasons:")
-            logger.info("- No more content available")
-            logger.info("- Button became disabled")
-            logger.info("- Network issues or page loading problems")
-        }
+        logger.info("Finished processing reviews. Total clicks: $clickCount, Total elements found: $finalElementCount")
     }
 
     fun close() {
