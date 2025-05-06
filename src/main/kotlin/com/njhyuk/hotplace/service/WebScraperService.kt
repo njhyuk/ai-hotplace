@@ -29,7 +29,7 @@ class WebScraperService {
         private const val MAX_CLICKS = 5
         private const val REVIEW_URL_PATTERN = "https://pcmap.place.naver.com/restaurant/\\d+/review/visitor"
         private const val MAP_URL_PATTERN = "https://map.naver.com/p/entry/place/\\d+"
-        private const val REDIRECTED_REVIEW_URL_PATTERN = "https://map.naver.com/p/entry/place/\\d+\\?placePath=%2Freview%2Fvisitor.*"
+        private const val REDIRECTED_REVIEW_URL_PATTERN = "https://map.naver.com/p/entry/place/\\d+\\?placePath=.*"
     }
 
     init {

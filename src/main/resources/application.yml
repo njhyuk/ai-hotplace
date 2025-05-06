@@ -1,6 +1,6 @@
 server:
   port: 8080
- 
+
 openai:
   api:
-    key: ${OPENAI_API_KEY}  # 환경 변수에서 API 키를 가져옵니다 
+    key: ${OPENAI_API_KEY:your_api_key_here}
