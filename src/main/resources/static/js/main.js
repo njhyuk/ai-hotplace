@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryText = document.getElementById('summaryText');
     const positivesList = document.getElementById('positivesList');
     const negativesList = document.getElementById('negativesList');
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.className = 'loading-indicator';
+    loadingIndicator.innerHTML = `
+        <div class="spinner"></div>
+        <p>리뷰를 분석하고 있습니다...</p>
+    `;
+    document.querySelector('.review-input').appendChild(loadingIndicator);
+    loadingIndicator.style.display = 'none';
 
     analyzeBtn.addEventListener('click', async () => {
         const url = reviewUrl.value.trim();
@@ -23,8 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // 기존 결과 숨기기
             resultContainer.style.display = 'none';
             
+            // 로딩 상태 표시
             analyzeBtn.disabled = true;
             analyzeBtn.textContent = '분석 중...';
+            loadingIndicator.style.display = 'flex';
 
             const response = await fetch('/api/reviews/analyze', {
                 method: 'POST',
@@ -38,7 +48,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('분석 중 오류가 발생했습니다.');
             }
 
-            const result = await response.json();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let result = null;
+            let error = null;
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                let currentEvent = null;
+                let currentData = null;
+                
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        currentData = line.slice(5).trim();
+                    }
+                    
+                    if (currentEvent && currentData) {
+                        try {
+                            const parsed = JSON.parse(currentData);
+                            if (currentEvent === 'error') {
+                                error = parsed.message;
+                            } else {
+                                result = parsed;
+                            }
+                            currentEvent = null;
+                            currentData = null;
+                        } catch (e) {
+                            console.error('Failed to parse SSE data:', e);
+                        }
+                    }
+                }
+            }
+
+            if (error) {
+                throw new Error(error);
+            }
+
+            if (!result) {
+                throw new Error('분석 결과를 받지 못했습니다.');
+            }
             
             // 상점명 표시
             document.getElementById('storeName').textContent = result.storeName;
@@ -66,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             analyzeBtn.disabled = false;
             analyzeBtn.textContent = '분석하기';
+            loadingIndicator.style.display = 'none';
         }
     });
 }); 

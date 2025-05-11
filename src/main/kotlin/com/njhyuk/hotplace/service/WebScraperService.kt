@@ -12,6 +12,11 @@ import org.springframework.stereotype.Service
 import org.slf4j.LoggerFactory
 import java.net.URL
 import org.openqa.selenium.WebElement
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 @Service
 class WebScraperService {
@@ -77,9 +82,9 @@ class WebScraperService {
         return metaTitle?.split(" : ")?.first() ?: ""
     }
 
-    fun scrapeWebPage(url: String): String {
+    suspend fun scrapeWebPage(url: String): String = withContext(Dispatchers.IO) {
         initDriver()
-        return try {
+        return@withContext try {
             logger.info("Starting to load URL: $url")
             
             // Convert map.naver.com URL to pcmap.place.naver.com URL if needed
@@ -124,7 +129,7 @@ class WebScraperService {
             val elements = findTargetElements()
             if (elements.isEmpty()) {
                 logger.warn("No matching elements found")
-                return "No matching elements found"
+                return@withContext "No matching elements found"
             }
 
             val reviews = extractAndFormatTexts(elements)
@@ -135,19 +140,25 @@ class WebScraperService {
         }
     }
 
-    private fun waitForPageLoad() {
-        wait?.until {
-            val readyState = js?.executeScript("return document.readyState") as String
-            logger.debug("Current page readyState: $readyState")
-            readyState == "complete"
+    private suspend fun waitForPageLoad() = suspendCancellableCoroutine<Unit> { continuation ->
+        try {
+            wait?.until {
+                val readyState = js?.executeScript("return document.readyState") as String
+                logger.debug("Current page readyState: $readyState")
+                readyState == "complete"
+            }
+            logger.info("Page load completed")
+            continuation.resume(Unit)
+        } catch (e: Exception) {
+            continuation.resumeWithException(e)
         }
-        logger.info("Page load completed")
     }
 
-    private fun waitForReactElements() {
-        logger.info("Waiting for React elements to render...")
+    private suspend fun waitForReactElements() = suspendCancellableCoroutine<Unit> { continuation ->
         try {
+            logger.info("Waiting for React elements to render...")
             wait?.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TARGET_ELEMENT_SELECTOR)))
+            continuation.resume(Unit)
         } catch (e: Exception) {
             logger.info("No more button found or all reviews are already loaded")
             val elements = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)) ?: emptyList<WebElement>()
@@ -156,6 +167,7 @@ class WebScraperService {
             } else {
                 logger.info("Found "+elements.size+" reviews without more button")
             }
+            continuation.resume(Unit)
         }
     }
 
@@ -188,7 +200,7 @@ class WebScraperService {
         }
     }
 
-    private fun clickMoreButtonMultipleTimes() {
+    private suspend fun clickMoreButtonMultipleTimes() = withContext(Dispatchers.IO) {
         logger.info("Attempting to click '더보기' button multiple times...")
         var clickCount = 0
         var previousElementCount = 0
@@ -196,7 +208,7 @@ class WebScraperService {
         val initialElements = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)) ?: emptyList()
         if (initialElements.isEmpty()) {
             logger.info("No reviews found on the page")
-            return
+            return@withContext
         }
         while (clickCount < MAX_CLICKS) {
             try {
