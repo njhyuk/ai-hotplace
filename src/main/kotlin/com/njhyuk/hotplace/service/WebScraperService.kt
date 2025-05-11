@@ -9,17 +9,16 @@ import org.openqa.selenium.support.ui.WebDriverWait
 import org.openqa.selenium.support.ui.ExpectedConditions
 import java.time.Duration
 import org.springframework.stereotype.Service
-import io.github.bonigarcia.wdm.WebDriverManager
-import org.openqa.selenium.WebElement
 import org.slf4j.LoggerFactory
 import java.net.URL
+import org.openqa.selenium.WebElement
 
 @Service
 class WebScraperService {
     private val logger = LoggerFactory.getLogger(WebScraperService::class.java)
-    private val driver: WebDriver
-    private val js: JavascriptExecutor
-    private val wait: WebDriverWait
+    private var driver: WebDriver? = null
+    private var js: JavascriptExecutor? = null
+    private var wait: WebDriverWait? = null
 
     companion object {
         private const val TIMEOUT_SECONDS = 20L
@@ -32,24 +31,35 @@ class WebScraperService {
         private const val REDIRECTED_REVIEW_URL_PATTERN = "https://map.naver.com/p/entry/place/\\d+\\?placePath=.*"
     }
 
-    init {
-        WebDriverManager.chromedriver().setup()
-        driver = ChromeDriver(createChromeOptions())
-        js = driver as JavascriptExecutor
-        wait = WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SECONDS))
+    private fun initDriver() {
+        if (driver == null) {
+            System.setProperty("webdriver.chrome.driver", "/usr/bin/chromedriver")
+            driver = ChromeDriver(createChromeOptions())
+            js = driver as JavascriptExecutor
+            wait = WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SECONDS))
+        }
     }
 
     private fun createChromeOptions(): ChromeOptions {
-        return ChromeOptions().apply {
-            addArguments("--headless")
-            addArguments("--no-sandbox")
-            addArguments("--disable-dev-shm-usage")
-            addArguments("--disable-gpu")
-            addArguments("--window-size=1920,1080")
-            addArguments("--start-maximized")
-            addArguments("--disable-blink-features=AutomationControlled")
-            addArguments("--user-agent=$USER_AGENT")
-        }
+        val options = ChromeOptions()
+        options.addArguments(
+            "--headless=new",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--remote-debugging-port=9222",
+            "--disable-extensions",
+            "--disable-software-rasterizer",
+            "--disable-setuid-sandbox",
+            "--disable-infobars",
+            "--disable-notifications",
+            "--disable-popup-blocking",
+            "--disable-web-security",
+            "--allow-running-insecure-content",
+            "--window-size=1920,1080"
+        )
+        options.setBinary("/usr/bin/chromium")
+        return options
     }
 
     private fun convertToReviewUrl(mapUrl: String): String {
@@ -63,11 +73,12 @@ class WebScraperService {
     }
 
     private fun extractPlaceName(): String {
-        val metaTitle = driver.findElement(By.cssSelector("meta[property='og:title']")).getAttribute("content")
-        return metaTitle.split(" : ").first()
+        val metaTitle = driver?.findElement(By.cssSelector("meta[property='og:title']"))?.getAttribute("content")
+        return metaTitle?.split(" : ")?.first() ?: ""
     }
 
     fun scrapeWebPage(url: String): String {
+        initDriver()
         return try {
             logger.info("Starting to load URL: $url")
             
@@ -80,20 +91,20 @@ class WebScraperService {
                 url
             }
             
-            driver.get(targetUrl)
+            driver?.get(targetUrl)
             
             // Wait for redirect and get the final URL
             waitForPageLoad()
-            var finalUrl = driver.currentUrl
+            var finalUrl = driver?.currentUrl ?: ""
             logger.info("Redirected to: $finalUrl")
 
             // If we got redirected to map.naver.com, convert and navigate to the actual review page
             if (finalUrl.matches(Regex(REDIRECTED_REVIEW_URL_PATTERN))) {
                 val actualReviewUrl = convertToReviewUrl(finalUrl)
                 logger.info("Converting redirected URL to actual review page: $actualReviewUrl")
-                driver.get(actualReviewUrl)
+                driver?.get(actualReviewUrl)
                 waitForPageLoad()
-                finalUrl = driver.currentUrl
+                finalUrl = driver?.currentUrl ?: ""
                 logger.info("Now on actual review page: $finalUrl")
             }
 
@@ -125,8 +136,8 @@ class WebScraperService {
     }
 
     private fun waitForPageLoad() {
-        wait.until { 
-            val readyState = js.executeScript("return document.readyState") as String
+        wait?.until {
+            val readyState = js?.executeScript("return document.readyState") as String
             logger.debug("Current page readyState: $readyState")
             readyState == "complete"
         }
@@ -136,23 +147,22 @@ class WebScraperService {
     private fun waitForReactElements() {
         logger.info("Waiting for React elements to render...")
         try {
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TARGET_ELEMENT_SELECTOR)))
+            wait?.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(TARGET_ELEMENT_SELECTOR)))
         } catch (e: Exception) {
             logger.info("No more button found or all reviews are already loaded")
-            // Check if there are any reviews at all
-            val elements = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))
+            val elements = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)) ?: emptyList<WebElement>()
             if (elements.isEmpty()) {
                 logger.warn("No reviews found on the page")
             } else {
-                logger.info("Found ${elements.size} reviews without more button")
+                logger.info("Found "+elements.size+" reviews without more button")
             }
         }
     }
 
     private fun findTargetElements(): List<WebElement> {
         logger.info("Finding elements using Selenium API...")
-        val elements = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))
-        logger.info("Found ${elements.size} elements")
+        val elements = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)) ?: emptyList<WebElement>()
+        logger.info("Found "+elements.size+" elements")
         return elements
     }
 
@@ -183,44 +193,33 @@ class WebScraperService {
         var clickCount = 0
         var previousElementCount = 0
         var consecutiveNoNewElements = 0
-        
-        // First check if there are any reviews at all
-        val initialElements = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))
+        val initialElements = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)) ?: emptyList()
         if (initialElements.isEmpty()) {
             logger.info("No reviews found on the page")
             return
         }
-        
         while (clickCount < MAX_CLICKS) {
             try {
-                // Try to find the more button with a shorter timeout
                 val moreButton = WebDriverWait(driver, Duration.ofSeconds(5))
                     .until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(MORE_BUTTON_SELECTOR)))
-                
                 if (!moreButton.isDisplayed || !moreButton.isEnabled) {
                     logger.info("More button is no longer visible or enabled after $clickCount clicks")
                     break
                 }
-                
-                // Get current element count before clicking
-                previousElementCount = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)).size
-                
+                previousElementCount = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))?.size ?: 0
                 moreButton.click()
                 clickCount++
                 logger.info("Clicked '더보기' button $clickCount times")
-                
-                // Wait for new elements to load
                 try {
-                    wait.until { 
-                        val currentElementCount = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)).size
+                    wait?.until {
+                        val currentElementCount = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))?.size ?: 0
                         currentElementCount > previousElementCount
                     }
                     consecutiveNoNewElements = 0
-                    logger.info("New elements loaded: ${driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)).size - previousElementCount}")
+                    logger.info("New elements loaded: "+((driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))?.size ?: 0) - previousElementCount))
                 } catch (e: Exception) {
                     consecutiveNoNewElements++
                     logger.warn("No new elements loaded after click $clickCount. Consecutive failures: $consecutiveNoNewElements")
-                    
                     if (consecutiveNoNewElements >= 2) {
                         logger.info("Stopping after $consecutiveNoNewElements consecutive failures to load new elements")
                         break
@@ -231,12 +230,14 @@ class WebScraperService {
                 break
             }
         }
-        
-        val finalElementCount = driver.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR)).size
+        val finalElementCount = driver?.findElements(By.cssSelector(TARGET_ELEMENT_SELECTOR))?.size ?: 0
         logger.info("Finished processing reviews. Total clicks: $clickCount, Total elements found: $finalElementCount")
     }
 
     fun close() {
-        driver.quit()
+        driver?.quit()
+        driver = null
+        js = null
+        wait = null
     }
 } 
