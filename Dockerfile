@@ -43,4 +43,4 @@ COPY --from=build /app/build/libs/*.jar app.jar
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "Xvfb :99 -screen 0 1024x768x16 & java $JAVA_OPTS -jar app.jar"] 
+ENTRYPOINT ["java", "-Xmx512m", "-Xms256m", "-jar", "app.jar"] 
